@@ -1,0 +1,76 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v6
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "9.3.1"
+
+      - name: Show versions
+        run: |
+          java -version
+          gradle --version
+
+      - name: Verify Android project
+        run: |
+          test -f settings.gradle.kts || {
+            echo "::error::settings.gradle.kts در ریشه پروژه پیدا نشد."
+            exit 1
+          }
+
+          test -f build.gradle.kts || {
+            echo "::error::build.gradle.kts در ریشه پروژه پیدا نشد."
+            exit 1
+          }
+
+          test -d app || {
+            echo "::error::پوشه app پیدا نشد."
+            exit 1
+          }
+
+          echo "Android project structure found."
+
+      - name: Build Debug APK
+        run: gradle :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Find generated APK
+        run: |
+          echo "Generated APK files:"
+          find app/build/outputs/apk -type f -name "*.apk" -print
+
+          test -n "$(find app/build/outputs/apk/debug -type f -name '*.apk' 2>/dev/null)" || {
+            echo "::error::فایل APK در مسیر خروجی پیدا نشد."
+            exit 1
+          }
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: IELTS-Leitner-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
